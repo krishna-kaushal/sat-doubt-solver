@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SAT Doubt Solver — stuck? get unstuck.</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand"><span class="logo">∑</span> Doubt Solver</div>
+    <div class="tag">SAT prep, minus the $8,000 tutor</div>
+  </header>
+
+  <main id="main">
+    <section id="input-card" class="card">
+      <h1>Stuck on a question?</h1>
+      <p class="sub">Paste it below or snap a photo. You'll get a step-by-step explanation plus 3 similar problems to lock it in.</p>
+      <textarea id="q-input" rows="5" placeholder="e.g. If 2(x − 3) = 4x + 6, what is the value of x?"></textarea>
+      <div class="input-row">
+        <label id="photo-btn" class="btn secondary" title="Upload a photo of the question">
+          📷 Photo
+          <input type="file" id="photo-input" accept="image/*" hidden>
+        </label>
+        <span id="photo-name" class="photo-name"></span>
+        <button id="solve-btn" class="btn primary">Solve →</button>
+      </div>
+      <div id="photo-preview-wrap" class="hidden">
+        <img id="photo-preview" alt="Question photo preview">
+        <button id="photo-clear" class="link" type="button">remove</button>
+      </div>
+    </section>
+
+    <section id="loading" class="card hidden">
+      <div class="spinner"></div>
+      <p id="loading-text">Reading your question…</p>
+    </section>
+
+    <section id="error-card" class="card error hidden">
+      <p id="error-text"></p>
+    </section>
+
+    <section id="result" class="hidden">
+      <div class="meta-row">
+        <span id="r-subject" class="chip"></span>
+        <span id="r-topic" class="topic"></span>
+      </div>
+      <div id="r-explanation" class="card explanation"></div>
+      <h2>Lock it in — 3 similar problems</h2>
+      <div id="r-problems"></div>
+      <button id="again-btn" class="btn secondary full">Solve another →</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>Built for the r/SAT grind. Explanations are AI-generated — always sanity-check against official material.</p>
+  </footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
