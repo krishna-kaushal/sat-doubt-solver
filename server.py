@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.request
 from collections import defaultdict, deque
@@ -45,7 +46,50 @@ Respond with JSON ONLY (no markdown fences, no commentary) in exactly this shape
 Rules:
 - The 3 practice problems must be ORIGINAL (never copies of official College Board questions), in digital SAT style and format.
 - Keep the explanation focused, student-friendly, and free of jargon.
+- Write maths in plain text (e.g. 2(x - 1) = 2, x = 2). Do NOT use LaTeX delimiters like \\( \\) or \\[ \\].
 - If the image is unclear or no question is detectable, set "subject" to "Unknown" and explain what you need in "explanation", with an empty "problems" array."""
+
+# Matches a backslash NOT followed by a valid JSON escape character.
+# Used to repair model output like \( or \. which is invalid JSON.
+_INVALID_ESCAPE_RE = re.compile(r'\\(?![\"\\/bfnrtu])')
+
+
+def _repair_invalid_escapes(s: str) -> str:
+    """Drop backslashes that start invalid JSON escapes (e.g. \\( -> ()."""
+    return _INVALID_ESCAPE_RE.sub("", s)
+
+
+def _try_parse(s: str) -> dict | None:
+    """Parse s as JSON, repairing invalid escapes once on failure."""
+    try:
+        data = json.loads(s)
+    except json.JSONDecodeError:
+        try:
+            data = json.loads(_repair_invalid_escapes(s))
+        except json.JSONDecodeError:
+            return None
+    return data if isinstance(data, dict) else None
+
+
+def extract_json(raw: str) -> dict | None:
+    """Robustly extract the JSON object from a model response."""
+    raw = raw.strip()
+    # 1. direct parse
+    data = _try_parse(raw)
+    if data is not None:
+        return data
+    # 2. fenced code block anywhere in the text
+    for m in re.finditer(r"```(?:json)?\s*\n?(.*?)```", raw, re.DOTALL):
+        data = _try_parse(m.group(1).strip())
+        if data is not None:
+            return data
+    # 3. outermost { ... } span
+    start, end = raw.find("{"), raw.rfind("}")
+    if 0 <= start < end:
+        data = _try_parse(raw[start : end + 1])
+        if data is not None:
+            return data
+    return None
 
 # simple in-memory rate limit: 12 solves / hour / IP (protects API credits)
 RATE_LIMIT = 12
@@ -81,6 +125,7 @@ def call_openrouter(text: str, image_data_url: str | None) -> dict:
         ],
         "temperature": 0.3,
         "max_tokens": 2500,
+        "response_format": {"type": "json_object"},
     }
     req = urllib.request.Request(
         API_URL,
@@ -103,16 +148,10 @@ def call_openrouter(text: str, image_data_url: str | None) -> dict:
     except (KeyError, IndexError, TypeError):
         raise HTTPException(status_code=502, detail="Unexpected AI provider response.")
     raw = raw.strip()
-    # tolerate markdown fences around the JSON
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1] if "\n" in raw else raw
-        if raw.rstrip().endswith("```"):
-            raw = raw.rstrip()[: -3]
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
+    data = extract_json(raw)
+    if data is None:
         raise HTTPException(status_code=502, detail="Could not parse the AI response.")
-    if not isinstance(data, dict) or "explanation" not in data:
+    if "explanation" not in data:
         raise HTTPException(status_code=502, detail="Incomplete AI response.")
     data.setdefault("problems", [])
     data.setdefault("subject", "Unknown")
